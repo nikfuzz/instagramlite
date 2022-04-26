@@ -15,7 +15,6 @@ class Users(models.Model):
 class Albums(models.Model):
     albumId = models.AutoField(primary_key=True)
     name = models.CharField(max_length=20)
-    pictureId = ArrayField(models.IntegerField(), blank=True)
     hashtags = ArrayField(models.CharField(max_length=20), blank=True)
     isPublished = models.BooleanField(default=False)
     username = models.ForeignKey("webapp.Users", on_delete=models.CASCADE)

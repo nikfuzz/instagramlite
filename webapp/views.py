@@ -9,19 +9,25 @@ from webapp.models import Users, Albums, Pictures
 from webapp.serializers import AlbumsSerializer, PicturesSerializer, UsersSerializer
 
 @csrf_exempt
-@api_view(['POST'])
-def pictures_add(request):
-
+@api_view(['POST', 'GET'])
+def pictures_add_get(request):
+    
     album = Albums.objects.get(albumId=request.POST['albumId'])
 
-    picture_instance = Pictures()
-    picture_instance.picture = request.FILES['picture']
-    picture_instance.albumId = album
-    picture_instance.caption = request.POST['caption']
-    picture_instance.fontColor = request.POST['fontColor']
-        
-    picture_instance.save()
-    return Response({}, status=201)
+    if request.method == 'POST':
+        picture_instance = Pictures()
+        picture_instance.picture = request.FILES['picture']
+        picture_instance.albumId = album
+        picture_instance.caption = request.POST['caption']
+        picture_instance.fontColor = request.POST['fontColor']
+            
+        picture_instance.save()
+        return Response({}, status=201)
+
+    if request.method == 'GET':
+        pictures_arr = Pictures.objects.filter(albumId=album.albumId)
+
+        return Response(list(pictures_arr.values()), status=200)
 
 @csrf_exempt
 @api_view(['GET', 'POST'])

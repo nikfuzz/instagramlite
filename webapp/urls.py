@@ -10,6 +10,7 @@ urlpatterns = [
     path('logout', views.logout_user),
     path('createAlbum', views.album_get_create),
     path('getAlbums', views.album_get_create),
-    path('addPicture', views.pictures_add)
+    path('addPicture', views.pictures_add_get),
+    path('getPictures', views.pictures_add_get)
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
