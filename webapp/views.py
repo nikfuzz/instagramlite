@@ -8,13 +8,18 @@ from rest_framework.exceptions import APIException
 from webapp.models import Users, Albums, Pictures
 from webapp.serializers import AlbumsSerializer, PicturesSerializer, UsersSerializer
 
+
+# api to get and add images to and from the album
+# note: for adding image we need to pass the data as a form
 @csrf_exempt
 @api_view(['POST', 'GET'])
 def pictures_add_get(request):
     
+    # getting album id is a must
     album = Albums.objects.get(albumId=request.POST['albumId'])
 
     if request.method == 'POST':
+        # creating a picture instance to save into the picture model
         picture_instance = Pictures()
         picture_instance.picture = request.FILES['picture']
         picture_instance.albumId = album
@@ -29,6 +34,8 @@ def pictures_add_get(request):
 
         return Response(list(pictures_arr.values()), status=200)
 
+# api to add and get album
+# request is recieved and passed as json
 @csrf_exempt
 @api_view(['GET', 'POST'])
 def album_get_create(request):
@@ -54,6 +61,9 @@ def album_get_create(request):
 
     raise APIException("Invalid request")
 
+# login validation for user
+# can be modified to token method
+# currently saves the user in session
 @csrf_exempt
 @api_view(['POST'])
 def login_user(request):
@@ -69,6 +79,7 @@ def login_user(request):
     if not user:
         raise APIException("Incorrect Username")
 
+    # checking if the hashed password matches the entered password
     if not check_password(payload['password'], user.password):
         raise APIException("Incorrect Password")
     
@@ -76,12 +87,15 @@ def login_user(request):
 
     return Response({}, status=200)
 
+# logout method to set the session null
 @csrf_exempt
 @api_view(['GET'])
 def logout_user(request):
     request.session['user_id'] = None
     return Response({}, status=200)
 
+# register method to register a new user
+# checks if the user already exists
 @csrf_exempt
 @api_view(['POST'])
 def register_user(request):
@@ -99,6 +113,7 @@ def register_user(request):
         if not payload['password']:
             raise APIException("Please enter password") 
 
+        # hashing the password
         payload['password'] = make_password(payload['password'])
     
     else:
