@@ -1,76 +1,111 @@
-from django.shortcuts import render
-from django.http import Http404, HttpResponse
-from django.conf import settings
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
+from rest_framework.parsers import JSONParser
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.hashers import make_password, check_password
 from rest_framework.exceptions import APIException
 
-import pymongo
-import certifi
+from webapp.models import Users, Albums, Pictures
+from webapp.serializers import AlbumsSerializer, PicturesSerializer, UsersSerializer
 
-# @api_view(['GET'])
-# def get_all_users(request):
-#     cluster = pymongo.MongoClient(settings.CONNECTION_STRING, tlsCAFile=certifi.where())
-#     collection = cluster['instagramlite']['Users']
-#     users = list(collection.find({}, {'username': 1, 'password':1, '_id': 0}))
-#     print(users)
-#     return Response(users)
+@csrf_exempt
+@api_view(['POST'])
+def pictures_add(request):
 
-def get_user_collection():
-    cluster = pymongo.MongoClient(settings.CONNECTION_STRING, tlsCAFile=certifi.where())
-    collection = cluster['instagramlite']['Users']
-    return collection
+    album = Albums.objects.get(albumId=request.POST['albumId'])
 
+    picture_instance = Pictures()
+    picture_instance.picture = request.FILES['picture']
+    picture_instance.albumId = album
+    picture_instance.caption = request.POST['caption']
+    picture_instance.fontColor = request.POST['fontColor']
+        
+    picture_instance.save()
+    return Response({}, status=201)
+
+@csrf_exempt
+@api_view(['GET', 'POST'])
+def album_get_create(request):
+
+    if request.method == 'POST':
+        payload = JSONParser().parse(request)
+
+        album_serializer = AlbumsSerializer(data=payload)
+        if album_serializer.is_valid():
+            album_serializer.save()
+            return Response(album_serializer.data, status=201)
+        
+        raise APIException("Could not save album, try again")
+
+    if request.method == 'GET':
+        if not request.session['user_id']:
+            raise APIException("Invalid user, please login again")
+
+        albums = Albums.objects.filter(username = request.session['user_id'])
+        albums = list(albums.values())
+
+        return Response(albums, status=200)
+
+    raise APIException("Invalid request")
+
+@csrf_exempt
 @api_view(['POST'])
 def login_user(request):
 
-    collection = get_user_collection()
-    user = collection.find_one({'username': request.POST['username']})
+    payload = JSONParser().parse(request)
+
+    if payload['username'] and payload['password']:
+        user = Users.objects.filter(username=payload['username']).first()
+
+    else:
+        raise APIException("Please enter username and password")
 
     if not user:
         raise APIException("Incorrect Username")
 
-    if not check_password(request.POST['password'], user['password']):
+    if not check_password(payload['password'], user.password):
         raise APIException("Incorrect Password")
     
-    user['_id'] = str(user['_id'])
-    request.session['user'] = user
-    return Response(user, status=200)
+    request.session['user_id'] = user.userId
 
-@api_view(['GET'])
-def logout_user(request):
-    request.session['user'] = None
     return Response({}, status=200)
 
+@csrf_exempt
+@api_view(['GET'])
+def logout_user(request):
+    request.session['user_id'] = None
+    return Response({}, status=200)
+
+@csrf_exempt
 @api_view(['POST'])
 def register_user(request):
 
-    if not request.POST['username']:
-        raise APIException("No username entered")
+    payload = {}
 
-    if not request.POST['password']:
-        raise APIException("No password entered")
+    if request.body:
+        payload = request
+        payload = JSONParser().parse(payload)
 
-    if not (request.POST['first_name'] and request.POST['last_name']):
-        raise APIException("Name not entered correctly")
+        # checks for username and password fields
+        if not payload['username']:
+            raise APIException("Please enter username") 
+        
+        if not payload['password']:
+            raise APIException("Please enter password") 
 
-
-    Users = get_user_collection()
-    existing_user = Users.find_one({'username': request.POST['username']}, {'_id': 0})
+        payload['password'] = make_password(payload['password'])
+    
+    else:
+        raise APIException("Incorrect request") 
+    
+    existing_user = Users.objects.filter(username=payload['username']).first()
 
     if existing_user:
         raise APIException("Username already exists")
 
-    user_instance = {
-        'username': request.POST['username'],
-        'password': make_password(request.POST['password']),
-        'first_name': request.POST['first_name'],
-        'last_name': request.POST['last_name']
-    }
+    user_serializer = UsersSerializer(data=payload)
+    if user_serializer.is_valid():
+        user_serializer.save()
+        return Response(user_serializer.data, status=201)
 
-    Users.insert_one(user_instance)
-    user_instance['_id'] = str(user_instance['_id'])
-
-    return Response(user_instance, status=201)
-
+    raise APIException("Failed to register user")
